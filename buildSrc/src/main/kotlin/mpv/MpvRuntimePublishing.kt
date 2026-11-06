@@ -5,7 +5,6 @@ import nativebuild.DesktopRuntimeTarget
 import nativebuild.MINIMUM_LINUX_GLIBC_VERSION
 import nativebuild.PublishedArtifact
 import nativebuild.VerifyLinuxGlibcBaselineTask
-import nativebuild.addCompilePomDependency
 import nativebuild.artifactSuffix
 import nativebuild.createDependencyOnlyJvmRuntimeElements
 import nativebuild.isSharedRuntimeLibrary
@@ -128,6 +127,7 @@ internal fun configureRuntimePublishing(
     context: MpvBuildContext,
     desktopRuntimeJarTasks: Map<DesktopRuntimeTarget, PublishedArtifact>,
 ) {
+    val runtimeGroup = "com.caij.lib.mediamp.audio"
     val deployVersion = context.project.version.toString()
     val runtimeTargets = context.desktopRuntimeTargets
 
@@ -149,7 +149,7 @@ internal fun configureRuntimePublishing(
     context.project.extensions.getByType<PublishingExtension>().publications.apply {
         desktopRuntimeJarTasks.forEach { (target, jarTask) ->
             create<MavenPublication>("mpvRuntime${target.publicationSuffix()}") {
-                groupId = "org.openani.mediamp"
+                groupId = runtimeGroup
                 artifactId = "mediamp-mpv-runtime-${target.artifactSuffix()}"
                 version = deployVersion
 
@@ -158,11 +158,8 @@ internal fun configureRuntimePublishing(
                     jarTask.builtBy?.let { builtBy(it) }
                 }
 
-                addCompilePomDependency(
-                    groupId = "org.openani.mediamp",
-                    artifactId = "mediamp-mpv",
-                    version = deployVersion,
-                )
+                // Consumers declare the Kotlin wrapper separately; private native runtime
+                // versions do not need to match the upstream wrapper version.
                 markAsAlias()
             }
         }
@@ -173,37 +170,39 @@ internal fun configureRuntimePublishing(
             configurationName = "mpvCompositeRuntimeElements-${target.artifactSuffix()}",
             moduleName = "mediamp-mpv-runtime-${target.artifactSuffix()}",
             runtimeJarArtifact = jarTask,
+            groupId = runtimeGroup,
             target = target,
         )
     }
 
     // 聚合工件 mediamp-mpv-runtime: 单一 JVM runtime variant, 依赖本次构建可发布的全部平台
     // runtime jar. 之前的属性化 per-OS variant 对普通 JVM 消费端会歧义 (consumer 不携带
-    // OS/arch 属性); fat 聚合零配置可用: runtimeOnly("org.openani.mediamp:mediamp-mpv-runtime")
+    // OS/arch 属性); fat 聚合零配置可用: runtimeOnly("com.caij.lib.mediamp.audio:mediamp-mpv-runtime")
     // 一行全平台通用 (loader 按平台化清单名取对应 natives). 关心分发体积的应用仍可按平台
     // 声明 mediamp-mpv-runtime-<os>-<arch>.
     if (desktopRuntimeJarTasks.isNotEmpty()) {
         val fatRuntimeVariant = context.project.createDependencyOnlyJvmRuntimeElements(
             configurationName = "mpvRuntimeAllElements",
             dependencyNotations = desktopRuntimeJarTasks.keys.map { target ->
-                "org.openani.mediamp:mediamp-mpv-runtime-${target.artifactSuffix()}:$deployVersion"
+                "${runtimeGroup}:mediamp-mpv-runtime-${target.artifactSuffix()}:$deployVersion"
             },
-            capabilityNotation = "org.openani.mediamp:mediamp-mpv-runtime:$deployVersion",
+            capabilityNotation = "${runtimeGroup}:mediamp-mpv-runtime:$deployVersion",
         )
 
         context.project.publishDesktopRuntimeAggregator(
             componentName = "mpvRuntimeElements",
             publicationName = "mpvRuntime",
-            groupId = "org.openani.mediamp",
+            groupId = runtimeGroup,
             artifactId = "mediamp-mpv-runtime",
             version = deployVersion,
             variantConfigurations = listOf(fatRuntimeVariant),
+            preservePomDependencies = true,
         )
     }
 
     context.project.wireDesktopRuntimeDependencyConstraints(
         runtimeTargets.map { target ->
-            "org.openani.mediamp:mediamp-mpv-runtime-${target.artifactSuffix()}:$deployVersion"
+            "${runtimeGroup}:mediamp-mpv-runtime-${target.artifactSuffix()}:$deployVersion"
         },
     )
 }

@@ -81,8 +81,8 @@ internal data class FfmpegBuildTarget(
 // ---------------------------------------------------------------------------------------
 
 /**
- * The trimmed feature set every platform starts from: shared libs, the decoders and
- * container formats mediamp actually plays, and nothing else (`--disable-everything`).
+ * Shared audio playback feature set. Video codecs are omitted; mixed-media containers
+ * remain enabled so their audio tracks can still be played (`--disable-everything`).
  */
 internal val commonConfigureFlags: List<String> = buildList {
     add("--disable-static")
@@ -92,36 +92,15 @@ internal val commonConfigureFlags: List<String> = buildList {
     add("--disable-ffprobe")
     add("--disable-doc")
     add("--disable-everything")
-    add("--enable-decoder=h264")
-    add("--enable-decoder=hevc")
-    add("--enable-decoder=av1")
-    add("--enable-decoder=vp9")
-    // Small built-in codec used by the native-runtime smoke tests to generate fixtures
-    // without relying on an externally installed libx264-enabled ffmpeg.
-    add("--enable-decoder=mpeg4")
-    // MPEG-2 video: DVD rips, older TV rips, and Japanese broadcast TS.
-    add("--enable-decoder=mpeg2video")
-    // VC-1: early Blu-ray (2006-2010) releases.
-    add("--enable-decoder=vc1")
-    // WMV family. wmv3 (WMV9) rides on the vc1 decoder; wmv1/wmv2 cover older
-    // ASF-era files.
-    add("--enable-decoder=wmv1")
-    add("--enable-decoder=wmv2")
-    add("--enable-decoder=wmv3")
-    // DivX 3 in early-2000s AVI fansubs; shares msmpeg4dec with wmv1/wmv2.
-    add("--enable-decoder=msmpeg4v3")
-    // RealMedia (rmvb): the dominant format of 2000s Chinese-community anime rips.
-    add("--enable-decoder=rv30")
-    add("--enable-decoder=rv40")
-    add("--enable-decoder=wrapped_avframe")
     add("--enable-decoder=pcm_s16le")
-    add("--enable-encoder=mpeg4")
     add("--enable-encoder=aac")
     add("--enable-encoder=srt")
     add("--enable-decoder=aac")
     add("--enable-decoder=opus")
     add("--enable-decoder=mp3")
     add("--enable-decoder=flac")
+    // Monkey's Audio (.ape).
+    add("--enable-decoder=ape")
     // Dolby Digital (AC-3) and Dolby Digital Plus (E-AC-3), common audio tracks in
     // WEB-DLs and BDRips. eac3 selects the ac3 decoder in configure; both are listed
     // explicitly for clarity.
@@ -137,6 +116,12 @@ internal val commonConfigureFlags: List<String> = buildList {
     // LPCM variants beyond pcm_s16le: Blu-ray LPCM in m2ts and 24-bit PCM in mkv.
     add("--enable-decoder=pcm_bluray")
     add("--enable-decoder=pcm_s24le")
+    // Common WAV variants: 32-bit integer, floating point, and G.711 companding.
+    add("--enable-decoder=pcm_s32le")
+    add("--enable-decoder=pcm_f32le")
+    add("--enable-decoder=pcm_f64le")
+    add("--enable-decoder=pcm_alaw")
+    add("--enable-decoder=pcm_mulaw")
     // Japanese broadcast TS uses LATM/LOAS AAC, which the plain aac decoder does
     // not accept.
     add("--enable-decoder=aac_latm")
@@ -183,6 +168,8 @@ internal val commonConfigureFlags: List<String> = buildList {
     add("--enable-demuxer=mov")
     add("--enable-demuxer=matroska")
     add("--enable-demuxer=flac")
+    add("--enable-demuxer=wav")
+    add("--enable-demuxer=ape")
     add("--enable-demuxer=mp3")
     add("--enable-demuxer=ogg")
     add("--enable-demuxer=aac")
@@ -209,10 +196,6 @@ internal val commonConfigureFlags: List<String> = buildList {
     add("--enable-protocol=pipe")
     add("--enable-protocol=concat")
     add("--enable-protocol=crypto")
-    add("--enable-parser=h264")
-    add("--enable-parser=hevc")
-    add("--enable-parser=av1")
-    add("--enable-parser=vp9")
     add("--enable-parser=aac")
     add("--enable-parser=aac_latm")
     add("--enable-parser=ac3")
@@ -220,23 +203,16 @@ internal val commonConfigureFlags: List<String> = buildList {
     add("--enable-parser=mlp")
     add("--enable-parser=opus")
     add("--enable-parser=mpegaudio")
-    add("--enable-parser=mpegvideo")
-    add("--enable-parser=vc1")
     add("--enable-parser=flac")
     add("--enable-parser=vorbis")
-    add("--enable-bsf=h264_mp4toannexb")
-    add("--enable-bsf=hevc_mp4toannexb")
     add("--enable-bsf=aac_adtstoasc")
     add("--enable-filter=aresample")
-    add("--enable-filter=scale")
     add("--enable-filter=concat")
-    add("--enable-filter=color")
     add("--enable-filter=sine")
-    add("--enable-filter=testsrc2")
     add("--enable-filter=anull")
-    add("--enable-filter=null")
     add("--enable-indev=lavfi")
     add("--enable-swresample")
+    // libmpv still links against libswscale even when video codecs are omitted.
     add("--enable-swscale")
     add("--disable-debug")
     add("--disable-autodetect")
@@ -260,60 +236,8 @@ private val secureTransportHttpTlsFlags: List<String> = listOf(
     "--enable-securetransport",
 ) + httpTlsProtocolFlags
 
-// D3D11VA hardware decoding: hwcontext_d3d11va for mpv's hwdec=d3d11va
-// (--disable-everything/--disable-autodetect strip these otherwise; without
-// them mpv falls back to software decoding on Windows).
-private val windowsD3d11vaFlags: List<String> = listOf(
-    "--enable-d3d11va",
-    "--enable-hwaccel=h264_d3d11va",
-    "--enable-hwaccel=h264_d3d11va2",
-    "--enable-hwaccel=hevc_d3d11va",
-    "--enable-hwaccel=hevc_d3d11va2",
-    "--enable-hwaccel=vp9_d3d11va",
-    "--enable-hwaccel=vp9_d3d11va2",
-    "--enable-hwaccel=av1_d3d11va",
-    "--enable-hwaccel=av1_d3d11va2",
-    "--enable-hwaccel=mpeg2_d3d11va",
-    "--enable-hwaccel=mpeg2_d3d11va2",
-    "--enable-hwaccel=vc1_d3d11va",
-    "--enable-hwaccel=vc1_d3d11va2",
-    "--enable-hwaccel=wmv3_d3d11va",
-    "--enable-hwaccel=wmv3_d3d11va2",
-    // FFmpeg has no mpeg4 D3D11VA hwaccel; mpeg4 stays software on Windows.
-)
-
-// VideoToolbox hardware decoding: hwcontext_videotoolbox for mpv's hwdec=videotoolbox
-// (--disable-everything/--disable-autodetect strip these otherwise; without them
-// av_hwdevice_ctx_create(AV_HWDEVICE_TYPE_VIDEOTOOLBOX) returns AVERROR(ENOMEM) —
-// libavutil's hw_table has no videotoolbox entry — and mpv falls back to software
-// decoding on macOS. mpv itself is built with -Dvideotoolbox-gl=enabled, so the GL
-// interop loads fine; only the ffmpeg hwdevice was missing.
-private val macosVideotoolboxFlags: List<String> = listOf(
-    "--enable-videotoolbox",
-    "--enable-hwaccel=h264_videotoolbox",
-    "--enable-hwaccel=hevc_videotoolbox",
-    "--enable-hwaccel=vp9_videotoolbox",
-    "--enable-hwaccel=av1_videotoolbox",
-    // Apple Silicon media engines have no MPEG-2 hardware decoder; VideoToolbox
-    // still accepts the session (software path inside VT) and mpv falls back
-    // cleanly, so enabling this is harmless there and a real win on Intel Macs.
-    "--enable-hwaccel=mpeg2_videotoolbox",
-    "--enable-hwaccel=mpeg4_videotoolbox",
-    // FFmpeg has no vc1 VideoToolbox hwaccel; VC-1 stays software on macOS.
-)
-
 private val linuxRuntimeSearchPathFlags: List<String> = listOf(
     "--extra-ldflags=-Wl,-rpath,'${'$'}ORIGIN'",
-)
-
-// dav1d software AV1 decoding. FFmpeg 8 removed the native AV1 software decoder (the
-// remaining `av1` decoder is a hwaccel-only shim), so software AV1 needs the external
-// libdav1d decoder, built from the mediamp-ffmpeg/dav1d submodule and linked statically
-// into libavcodec. The native `av1` decoder stays enabled: the AV1 hwaccels
-// (d3d11va/videotoolbox/nvdec/vaapi) attach to it.
-private val dav1dFlags: List<String> = listOf(
-    "--enable-libdav1d",
-    "--enable-decoder=libdav1d",
 )
 
 // ---------------------------------------------------------------------------------------
@@ -342,7 +266,7 @@ private fun FfmpegBuildContext.windowsX64Target(): FfmpegBuildTarget {
             "--target-os=mingw32",
             "--cc=${msys2Dir.resolve("ucrt64/bin/gcc.exe").absolutePath.toMsysPath()}",
             "--cxx=${msys2Dir.resolve("ucrt64/bin/g++.exe").absolutePath.toMsysPath()}",
-        ) + opensslHttpTlsFlags + windowsD3d11vaFlags + dav1dFlags,
+        ) + opensslHttpTlsFlags,
         env = mapOf("MSYSTEM" to "UCRT64"),
         shell = msys2Dir.resolve("usr/bin/bash.exe").absolutePath,
         libExtension = "dll",
@@ -355,13 +279,6 @@ private fun FfmpegBuildContext.windowsX64Target(): FfmpegBuildTarget {
         jniWrapperExtraLibs = listOf("-lstdc++"),
         msysSubsystem = "ucrt64",
         collectWindowsRuntime = true,
-        dav1dEnabled = true,
-        dav1dMsys2Packages = listOf(
-            "mingw-w64-ucrt-x86_64-gcc",
-            "mingw-w64-ucrt-x86_64-meson",
-            "mingw-w64-ucrt-x86_64-ninja",
-            "mingw-w64-ucrt-x86_64-nasm",
-        ),
     )
 }
 
@@ -383,7 +300,7 @@ private fun FfmpegBuildContext.windowsArm64Target(): FfmpegBuildTarget {
             "--target-os=mingw32",
             "--cc=${msys2Dir.resolve("clangarm64/bin/clang.exe").absolutePath.toMsysPath()}",
             "--cxx=${msys2Dir.resolve("clangarm64/bin/clang++.exe").absolutePath.toMsysPath()}",
-        ) + opensslHttpTlsFlags + windowsD3d11vaFlags + dav1dFlags,
+        ) + opensslHttpTlsFlags,
         env = mapOf("MSYSTEM" to "CLANGARM64"),
         shell = msys2Dir.resolve("usr/bin/bash.exe").absolutePath,
         libExtension = "dll",
@@ -396,12 +313,6 @@ private fun FfmpegBuildContext.windowsArm64Target(): FfmpegBuildTarget {
         jniWrapperExtraLibs = listOf("-lstdc++"),
         msysSubsystem = "clangarm64",
         collectWindowsRuntime = true,
-        dav1dEnabled = true,
-        dav1dMsys2Packages = listOf(
-            "mingw-w64-clang-aarch64-clang",
-            "mingw-w64-clang-aarch64-meson",
-            "mingw-w64-clang-aarch64-ninja",
-        ),
     )
 }
 
@@ -414,32 +325,7 @@ internal fun FfmpegBuildContext.linuxX64Target(): FfmpegBuildTarget = FfmpegBuil
     configureFlags = listOf(
         "--arch=x86_64",
         "--target-os=linux",
-        // mpv's `hwdec=nvdec` uses the ordinary software decoders with FFmpeg's
-        // NVDEC hwaccels. CUDA/NVDEC driver libraries are loaded dynamically at
-        // runtime; ffnvcodec headers are a build-only dependency.
-        "--enable-ffnvcodec",
-        "--enable-nvdec",
-        "--enable-hwaccel=h264_nvdec",
-        "--enable-hwaccel=hevc_nvdec",
-        "--enable-hwaccel=vp9_nvdec",
-        "--enable-hwaccel=av1_nvdec",
-        "--enable-hwaccel=mpeg2_nvdec",
-        "--enable-hwaccel=mpeg4_nvdec",
-        "--enable-hwaccel=vc1_nvdec",
-        "--enable-hwaccel=wmv3_nvdec",
-        // Intel and AMD share FFmpeg's VAAPI hwdevice. mediamp deliberately uses
-        // mpv's vaapi-copy path with the GLX renderer; direct DMA-BUF/EGL import is
-        // a separate capability and is not claimed by this build.
-        "--enable-vaapi",
-        "--enable-hwaccel=h264_vaapi",
-        "--enable-hwaccel=hevc_vaapi",
-        "--enable-hwaccel=vp9_vaapi",
-        "--enable-hwaccel=av1_vaapi",
-        "--enable-hwaccel=mpeg2_vaapi",
-        "--enable-hwaccel=mpeg4_vaapi",
-        "--enable-hwaccel=vc1_vaapi",
-        "--enable-hwaccel=wmv3_vaapi",
-    ) + opensslHttpTlsFlags + linuxRuntimeSearchPathFlags + dav1dFlags,
+    ) + opensslHttpTlsFlags + linuxRuntimeSearchPathFlags,
     libExtension = "so",
     toolchainProbes = listOf(
         listOf("cc", "--version"),
@@ -447,7 +333,6 @@ internal fun FfmpegBuildContext.linuxX64Target(): FfmpegBuildTarget = FfmpegBuil
         listOf("pkg-config", "--modversion", "openssl"),
     ),
     jniWrapperName = "libffmpegkitjni.so",
-    dav1dEnabled = true,
 )
 
 // ---------------------------------------------------------------------------------------
@@ -469,7 +354,7 @@ private fun macosTarget(name: String, arch: String): FfmpegBuildTarget = FfmpegB
         "--cxx=clang++",
         "--extra-cflags=-arch $arch -mmacosx-version-min=12.0",
         "--extra-ldflags=-arch $arch -mmacosx-version-min=12.0",
-    ) + secureTransportHttpTlsFlags + macosVideotoolboxFlags + dav1dFlags,
+    ) + secureTransportHttpTlsFlags,
     libExtension = "dylib",
     toolchainProbes = listOf(
         listOf("clang", "--version"),
@@ -477,13 +362,6 @@ private fun macosTarget(name: String, arch: String): FfmpegBuildTarget = FfmpegB
     jniWrapperName = "libffmpegkitjni.dylib",
     jniWrapperLinkFlags = listOf("-dynamiclib", "-Wl,-install_name,@loader_path/libffmpegkitjni.dylib"),
     rewriteAppleInstallNames = true,
-    dav1dEnabled = true,
-    // Match the FFmpeg deployment target so the linker does not warn about object files
-    // built for a newer macOS version than the libraries they end up in.
-    dav1dMesonArgs = listOf(
-        "-Dc_args=-mmacosx-version-min=12.0",
-        "-Dc_link_args=-mmacosx-version-min=12.0",
-    ),
 )
 
 // ---------------------------------------------------------------------------------------

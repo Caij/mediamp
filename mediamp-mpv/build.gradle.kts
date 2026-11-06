@@ -8,10 +8,8 @@
 
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.KotlinMultiplatform
-import com.vanniktech.maven.publish.SourcesJar
 import mpv.configureMediampMpvModule
+import mpv.configurePrivateRuntimeRepository
 import mpv.configureRenderPathMatrix
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
@@ -23,7 +21,7 @@ plugins {
     id("org.jetbrains.compose")
 
     `mpp-lib-targets`
-    id(libs.plugins.vanniktech.mavenPublish.get().pluginId)
+    id("com.vanniktech.maven.publish.base")
     idea
 }
 
@@ -228,19 +226,13 @@ if (hostMpvRuntimeJarTaskName != null && hostMpvRuntimeJarTaskName in tasks.name
 // ./gradlew --continue :mediamp-mpv:renderPathMatrix [-Pmediamp.mpv.renderpath.tier=ci|gpu|hybrid]
 configureRenderPathMatrix()
 
-// The Android AAR bundles the LGPL libmpv (.so) built with -Dgpl=false; every other
-// publication of this module is pure Kotlin/JNI glue (Apache-2.0). Desktop natives ship in
-// the separate mediamp-mpv-runtime-* artifacts (see MpvRuntimePublishing.kt).
-setPublicationLicenses("android", PomLicenses.APACHE_WITH_LGPL_RUNTIME)
-
+// Publish only private desktop native runtimes. Kotlin/Android artifacts remain buildable
+// in this repository, but are excluded from this module's publication entry points.
 mavenPublishing {
-    configure(
-        KotlinMultiplatform(JavadocJar.Empty(), SourcesJar.Sources(), listOf("debug", "release")),
-    )
-    publishToMavenCentral()
-    signAllPublicationsIfEnabled(project)
     configurePom(project)
 }
+
+configurePrivateRuntimeRepository()
 
 val cleanNativeBuild = tasks.register("cleanNativeBuild", Delete::class.java) {
     group = "mediamp"

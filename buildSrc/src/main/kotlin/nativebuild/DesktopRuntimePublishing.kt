@@ -28,6 +28,7 @@ internal fun Project.registerCompositeDesktopRuntimeElements(
     moduleName: String,
     runtimeJarArtifact: PublishedArtifact,
     target: DesktopRuntimeTarget,
+    groupId: String = "org.openani.mediamp",
 ): Configuration =
     configurations.create(configurationName).apply {
         isCanBeConsumed = true
@@ -37,7 +38,7 @@ internal fun Project.registerCompositeDesktopRuntimeElements(
         outgoing.artifact(runtimeJarArtifact.artifactNotation) {
             runtimeJarArtifact.builtBy?.let { builtBy(it) }
         }
-        outgoing.capability("org.openani.mediamp:$moduleName:$version")
+        outgoing.capability("$groupId:$moduleName:$version")
     }
 
 internal fun Project.createDependencyOnlyDesktopRuntimeElements(
@@ -89,6 +90,7 @@ internal fun Project.publishDesktopRuntimeAggregator(
     artifactId: String,
     version: String,
     variantConfigurations: Iterable<Configuration>,
+    preservePomDependencies: Boolean = false,
 ) {
     val variants = variantConfigurations.toList()
     if (variants.isEmpty()) return
@@ -105,7 +107,7 @@ internal fun Project.publishDesktopRuntimeAggregator(
         this.groupId = groupId
         this.artifactId = artifactId
         this.version = version
-        stripPomDependencies()
+        if (!preservePomDependencies) stripPomDependencies()
         markAsAlias()
     }
 }

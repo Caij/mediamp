@@ -1,448 +1,448 @@
-# This file was generated using Kotlin DSL (.github/workflows/src.main.kts).
-# If you want to modify the workflow, please change the Kotlin file and regenerate this YAML file.
-# Generated with https://github.com/typesafegithub/github-workflows-kt
-
-name: 'Build'
-on:
-  push:
-    paths-ignore:
-    - '**/*.md'
-  pull_request:
-    paths-ignore:
-    - '**/*macosDmg.md'
-concurrency:
-  group: 'build-${{ github.event_name }}-${{ github.ref == ''refs/heads/main'' && github.run_id || github.ref }}'
-  cancel-in-progress: true
-jobs:
-  build_github-windows-2022:
-    name: 'Build (Windows Server 2022 x86_64)'
-    runs-on:
-    - 'windows-2022'
-    permissions:
-      actions: 'write'
-    steps:
-    - id: 'step-0'
-      uses: 'actions/checkout@v4'
-      with:
-        lfs: 'true'
-        submodules: 'recursive'
-    - id: 'step-1'
-      name: 'Setup JBR 21 for other OS'
-      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
-      with:
-        java-version: '21'
-        distribution: 'jetbrains'
-      env:
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-    - id: 'step-2'
-      run: 'echo "jvm.toolchain.version=21" >> local.properties'
-    - id: 'step-3'
-      name: 'Find MSYS2 ucrt64 for mpv'
-      run: |-
-        $pacman = 'C:\msys64\usr\bin\pacman.exe'
-        $found = $false
-        if (Test-Path $pacman) {
-            # Missing packages are reported on stderr.
-            & $pacman -Q @('git mingw-w64-ucrt-x86_64-ca-certificates mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libass mingw-w64-ucrt-x86_64-libplacebo mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-python-certifi mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-shaderc mingw-w64-ucrt-x86_64-spirv-cross' -split ' ') | Out-Null
-            $found = $LASTEXITCODE -eq 0
-        }
-        "found=$("$found".ToLower())" >> $env:GITHUB_OUTPUT
-        exit 0
-    - id: 'step-4'
-      name: 'Setup MSYS2 ucrt64 for mpv'
-      uses: 'msys2/setup-msys2@v2'
-      with:
-        msystem: 'UCRT64'
-        update: 'true'
-        install: 'git mingw-w64-ucrt-x86_64-ca-certificates mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libass mingw-w64-ucrt-x86_64-libplacebo mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-python-certifi mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-shaderc mingw-w64-ucrt-x86_64-spirv-cross'
-      if: 'steps.step-3.outputs.found != ''true'''
-    - id: 'step-5'
-      name: 'Configure MSYS2 root'
-      run: |-
-        $msys2Dir = '${{ steps.step-4.outputs.msys2-location }}'.Replace('\', '/')
-        "msys2.dir=$msys2Dir" >> local.properties
-      if: 'steps.step-3.outputs.found != ''true'''
-    - id: 'step-6'
-      name: 'Setup Gradle'
-      uses: 'gradle/actions/setup-gradle@v3'
-      with:
-        cache-disabled: 'true'
-    - id: 'step-7'
-      name: 'Clean and download dependencies'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '3'
-        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-8'
-      name: 'Check'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '2'
-        command: './gradlew check "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-9'
-      name: 'Render path matrix'
-      continue-on-error: true
-      run: './gradlew --continue :mediamp-mpv:renderPathMatrix "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-10'
-      name: 'Upload render path matrix'
-      uses: 'actions/upload-artifact@v4'
-      with:
-        name: 'render-path-matrix-github-windows-2022'
-        path: 'mediamp-mpv/build/render-path-matrix/'
-        if-no-files-found: 'warn'
-        overwrite: 'true'
-      if: 'always()'
-    - id: 'step-11'
-      name: 'Build FFmpeg artifacts'
-      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-12'
-      name: 'Build mpv runtime jar'
-      run: './gradlew :mediamp-mpv:mpvRuntimeJarWindowsX64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-13'
-      name: 'Verify mpv zero-config loading'
-      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-14'
-      name: 'Verify mpv Maven publication'
-      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-  build_github-windows-11-arm64:
-    name: 'Build (Windows 11 AArch64 (GitHub))'
-    runs-on:
-    - 'windows-11-arm'
-    permissions:
-      actions: 'write'
-    steps:
-    - id: 'step-0'
-      uses: 'actions/checkout@v4'
-      with:
-        lfs: 'true'
-        submodules: 'recursive'
-    - id: 'step-1'
-      name: 'Setup JDK 17 for Windows ARM64'
-      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
-      with:
-        java-version: '17'
-        distribution: 'microsoft'
-      env:
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-    - id: 'step-2'
-      name: 'Setup JBR 21 for other OS'
-      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
-      with:
-        java-version: '21'
-        distribution: 'jetbrains'
-      env:
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-    - id: 'step-3'
-      run: 'echo "jvm.toolchain.version=21" >> local.properties'
-    - id: 'step-4'
-      name: 'Setup MSYS2 clangarm64'
-      uses: 'msys2/setup-msys2@v2'
-      with:
-        msystem: 'CLANGARM64'
-        update: 'true'
-        install: |-
-          git
-          mingw-w64-clang-aarch64-clang
-          mingw-w64-clang-aarch64-lld
-          mingw-w64-clang-aarch64-libass
-          mingw-w64-clang-aarch64-libplacebo
-          mingw-w64-clang-aarch64-meson
-          mingw-w64-clang-aarch64-ninja
-          mingw-w64-clang-aarch64-pkgconf
-          mingw-w64-clang-aarch64-nasm
-          mingw-w64-clang-aarch64-openssl
-          mingw-w64-clang-aarch64-ca-certificates
-          mingw-w64-clang-aarch64-python-certifi
-          mingw-w64-clang-aarch64-python
-          mingw-w64-clang-aarch64-shaderc
-          mingw-w64-clang-aarch64-spirv-cross
-    - id: 'step-5'
-      name: 'Configure MSYS2 root'
-      run: |-
-        $msys2Dir = '${{ steps.step-4.outputs.msys2-location }}'.Replace('\', '/')
-        "msys2.dir=$msys2Dir" >> local.properties
-    - id: 'step-6'
-      name: 'Setup Gradle'
-      uses: 'gradle/actions/setup-gradle@v3'
-      with:
-        cache-disabled: 'true'
-    - id: 'step-7'
-      name: 'Clean and download dependencies'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '3'
-        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-8'
-      name: 'Check'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '2'
-        command: './gradlew :mediamp-mpv:desktopTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-9'
-      name: 'Render path matrix'
-      continue-on-error: true
-      run: './gradlew --continue :mediamp-mpv:renderPathMatrix "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-10'
-      name: 'Upload render path matrix'
-      uses: 'actions/upload-artifact@v4'
-      with:
-        name: 'render-path-matrix-github-windows-11-arm64'
-        path: 'mediamp-mpv/build/render-path-matrix/'
-        if-no-files-found: 'warn'
-        overwrite: 'true'
-      if: 'always()'
-    - id: 'step-11'
-      name: 'Build FFmpeg artifacts'
-      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-12'
-      name: 'Build FFmpeg runtime jar'
-      run: './gradlew :mediamp-ffmpeg:ffmpegRuntimeJarWindowsArm64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-13'
-      name: 'Upload FFmpeg runtime jar'
-      uses: 'actions/upload-artifact@v4'
-      with:
-        name: 'mediamp-ffmpeg-runtime-windows-arm64'
-        path: 'mediamp-ffmpeg/build/libs/mediamp-ffmpeg-runtime-*-windows-arm64.jar'
-        if-no-files-found: 'error'
-        overwrite: 'true'
-    - id: 'step-14'
-      name: 'Build mpv runtime jar'
-      run: './gradlew :mediamp-mpv:mpvRuntimeJarWindowsArm64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-15'
-      name: 'Verify mpv zero-config loading'
-      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-    - id: 'step-16'
-      name: 'Verify mpv Maven publication'
-      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishMpvRuntimeWindowsArm64PublicationToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
-  build_github-ubuntu-2404:
-    name: 'Build (Ubuntu 24.04 x86_64)'
-    runs-on:
-    - 'ubuntu-24.04'
-    permissions:
-      actions: 'write'
-    steps:
-    - id: 'step-0'
-      uses: 'actions/checkout@v4'
-      with:
-        lfs: 'true'
-        submodules: 'recursive'
-    - id: 'step-1'
-      name: 'Setup JBR 21 for other OS'
-      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
-      with:
-        java-version: '21'
-        distribution: 'jetbrains'
-      env:
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-    - id: 'step-2'
-      run: 'echo "jvm.toolchain.version=21" >> local.properties'
-    - id: 'step-3'
-      run: 'chmod -R 777 .'
-    - id: 'step-4'
-      name: 'Install FFmpeg Dependencies for Ubuntu'
-      run: 'chmod +x ./ci-helper/install-ffmpeg-deps-ubuntu.sh && ./ci-helper/install-ffmpeg-deps-ubuntu.sh'
-    - id: 'step-5'
-      name: 'Install mpv Dependencies for Ubuntu'
-      run: 'chmod +x ./ci-helper/install-mpv-deps-ubuntu.sh && ./ci-helper/install-mpv-deps-ubuntu.sh'
-    - id: 'step-6'
-      name: 'Setup Gradle'
-      uses: 'gradle/actions/setup-gradle@v3'
-      with:
-        cache-disabled: 'true'
-    - id: 'step-7'
-      name: 'Clean and download dependencies'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '3'
-        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
-    - id: 'step-8'
-      name: 'Check'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '2'
-        command: './gradlew check "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
-    - id: 'step-9'
-      name: 'Build FFmpeg artifacts'
-      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
-    - id: 'step-10'
-      name: 'Build mpv runtime jar'
-      run: './gradlew :mediamp-mpv:mpvRuntimeJarLinuxX64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
-    - id: 'step-11'
-      name: 'Verify mpv zero-config loading'
-      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
-    - id: 'step-12'
-      name: 'Verify mpv Maven publication'
-      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
-  build_github-macos-15-intel:
-    name: 'Build (macOS 15 x86_64 (GitHub))'
-    runs-on:
-    - 'macos-15-intel'
-    permissions:
-      actions: 'write'
-    steps:
-    - id: 'step-0'
-      uses: 'actions/checkout@v4'
-      with:
-        lfs: 'true'
-        submodules: 'recursive'
-    - id: 'step-1'
-      name: 'Free space for macOS'
-      continue-on-error: true
-      run: 'chmod +x ./ci-helper/free-space-macos.sh && ./ci-helper/free-space-macos.sh'
-    - id: 'step-2'
-      name: 'Setup JBR 21 for other OS'
-      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
-      with:
-        java-version: '21'
-        distribution: 'jetbrains'
-      env:
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-    - id: 'step-3'
-      run: 'echo "jvm.toolchain.version=21" >> local.properties'
-    - id: 'step-4'
-      run: 'chmod -R 777 .'
-    - id: 'step-5'
-      name: 'Install dependencies for macOS'
-      run: 'brew install nasm'
-    - id: 'step-6'
-      name: 'Install mpv build dependencies for macOS'
-      run: 'brew install meson ninja libass libplacebo'
-    - id: 'step-7'
-      name: 'Setup Gradle'
-      uses: 'gradle/actions/setup-gradle@v3'
-      with:
-        cache-disabled: 'true'
-    - id: 'step-8'
-      name: 'Clean and download dependencies'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '3'
-        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-9'
-      name: 'Check'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '2'
-        command: './gradlew check "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-10'
-      name: 'Build FFmpeg artifacts'
-      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-11'
-      name: 'Build mpv runtime jar'
-      run: './gradlew :mediamp-mpv:mpvRuntimeJarMacosX64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-12'
-      name: 'Verify mpv zero-config loading'
-      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-13'
-      name: 'Verify mpv Maven publication'
-      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
-  build_self-hosted-macos-15:
-    name: 'Build (macOS 15 AArch64 (Self-Hosted))'
-    runs-on:
-    - 'self-hosted'
-    - 'macOS'
-    - 'ARM64'
-    permissions:
-      actions: 'write'
-    if: '${{ github.repository == ''open-ani/mediamp'' }}'
-    steps:
-    - id: 'step-0'
-      uses: 'actions/checkout@v4'
-      with:
-        lfs: 'true'
-        submodules: 'recursive'
-    - id: 'step-1'
-      name: 'Resolve JBR location'
-      run: |-
-        # Expand jbrLocationExpr
-        jbr_location_expr=$(eval echo ${{ runner.tool_cache }}/jbrsdk_jcef-21.0.5-osx-aarch64-b631.8.tar.gz)
-        echo "jbrLocation=$jbr_location_expr" >> $GITHUB_OUTPUT
-    - id: 'step-2'
-      name: 'Get JBR 21 for macOS AArch64'
-      env:
-        jbrLocation: '${{ steps.step-1.outputs.jbrLocation }}'
-      run: |-
-        jbr_location="$jbrLocation"
-        checksum_url="https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.5-osx-aarch64-b631.8.tar.gz.checksum"
-        checksum_file="checksum.tmp"
-        wget -q -O $checksum_file $checksum_url
-
-        expected_checksum=$(awk '{print $1}' $checksum_file)
-        file_checksum=""
-
-        if [ -f "$jbr_location" ]; then
-            file_checksum=$(shasum -a 512 "$jbr_location" | awk '{print $1}')
-        fi
-
-        if [ "$file_checksum" != "$expected_checksum" ]; then
-            wget -q --tries=3 https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.5-osx-aarch64-b631.8.tar.gz -O "$jbr_location"
-            file_checksum=$(shasum -a 512 "$jbr_location" | awk '{print $1}')
-        fi
-
-        if [ "$file_checksum" != "$expected_checksum" ]; then
-            echo "Checksum verification failed!" >&2
-            rm -f $checksum_file
-            exit 1
-        fi
-
-        rm -f $checksum_file
-        file "$jbr_location"
-    - id: 'step-3'
-      name: 'Setup JBR 21 for macOS AArch64'
-      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
-      with:
-        java-version: '21'
-        distribution: 'jdkfile'
-        jdkFile: '${{ steps.step-1.outputs.jbrLocation }}'
-      env:
-        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-    - id: 'step-4'
-      run: 'echo "jvm.toolchain.version=21" >> local.properties'
-    - id: 'step-5'
-      run: 'chmod -R 777 .'
-    - id: 'step-6'
-      name: 'Setup Gradle'
-      uses: 'gradle/actions/setup-gradle@v3'
-      with:
-        cache-disabled: 'true'
-    - id: 'step-7'
-      name: 'Clean and download dependencies'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '3'
-        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-8'
-      name: 'Check'
-      uses: 'nick-fields/retry@v2'
-      with:
-        timeout_minutes: '60'
-        max_attempts: '2'
-        command: './gradlew check "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-9'
-      name: 'Build FFmpeg artifacts'
-      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-10'
-      name: 'Verify Apple XCFramework publication'
-      run: './gradlew -Dmaven.repo.local=mediamp-ffmpeg/build/maven-local :mediamp-ffmpeg:publishFfmpegRuntimeIosXcframeworkPublicationToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-11'
-      name: 'Build mpv runtime jar'
-      run: './gradlew :mediamp-mpv:mpvRuntimeJarMacosArm64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-12'
-      name: 'Verify mpv zero-config loading'
-      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-13'
-      name: 'Verify mpv Maven publication'
-      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
-    - id: 'step-14'
-      name: 'Cleanup temp files'
-      continue-on-error: true
-      run: 'chmod +x ./ci-helper/cleanup-temp-files-macos.sh && ./ci-helper/cleanup-temp-files-macos.sh'
+## This file was generated using Kotlin DSL (.github/workflows/src.main.kts).
+## If you want to modify the workflow, please change the Kotlin file and regenerate this YAML file.
+## Generated with https://github.com/typesafegithub/github-workflows-kt
+#
+#name: 'Build'
+#on:
+#  push:
+#    paths-ignore:
+#    - '**/*.md'
+#  pull_request:
+#    paths-ignore:
+#    - '**/*macosDmg.md'
+#concurrency:
+#  group: 'build-${{ github.event_name }}-${{ github.ref == ''refs/heads/main'' && github.run_id || github.ref }}'
+#  cancel-in-progress: true
+#jobs:
+#  build_github-windows-2022:
+#    name: 'Build (Windows Server 2022 x86_64)'
+#    runs-on:
+#    - 'windows-2022'
+#    permissions:
+#      actions: 'write'
+#    steps:
+#    - id: 'step-0'
+#      uses: 'actions/checkout@v4'
+#      with:
+#        lfs: 'true'
+#        submodules: 'recursive'
+#    - id: 'step-1'
+#      name: 'Setup JBR 21 for other OS'
+#      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
+#      with:
+#        java-version: '21'
+#        distribution: 'jetbrains'
+#      env:
+#        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+#    - id: 'step-2'
+#      run: 'echo "jvm.toolchain.version=21" >> local.properties'
+#    - id: 'step-3'
+#      name: 'Find MSYS2 ucrt64 for mpv'
+#      run: |-
+#        $pacman = 'C:\msys64\usr\bin\pacman.exe'
+#        $found = $false
+#        if (Test-Path $pacman) {
+#            # Missing packages are reported on stderr.
+#            & $pacman -Q @('git mingw-w64-ucrt-x86_64-ca-certificates mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libass mingw-w64-ucrt-x86_64-libplacebo mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-python-certifi mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-shaderc mingw-w64-ucrt-x86_64-spirv-cross' -split ' ') | Out-Null
+#            $found = $LASTEXITCODE -eq 0
+#        }
+#        "found=$("$found".ToLower())" >> $env:GITHUB_OUTPUT
+#        exit 0
+#    - id: 'step-4'
+#      name: 'Setup MSYS2 ucrt64 for mpv'
+#      uses: 'msys2/setup-msys2@v2'
+#      with:
+#        msystem: 'UCRT64'
+#        update: 'true'
+#        install: 'git mingw-w64-ucrt-x86_64-ca-certificates mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libass mingw-w64-ucrt-x86_64-libplacebo mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-python-certifi mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-shaderc mingw-w64-ucrt-x86_64-spirv-cross'
+#      if: 'steps.step-3.outputs.found != ''true'''
+#    - id: 'step-5'
+#      name: 'Configure MSYS2 root'
+#      run: |-
+#        $msys2Dir = '${{ steps.step-4.outputs.msys2-location }}'.Replace('\', '/')
+#        "msys2.dir=$msys2Dir" >> local.properties
+#      if: 'steps.step-3.outputs.found != ''true'''
+#    - id: 'step-6'
+#      name: 'Setup Gradle'
+#      uses: 'gradle/actions/setup-gradle@v3'
+#      with:
+#        cache-disabled: 'true'
+#    - id: 'step-7'
+#      name: 'Clean and download dependencies'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '3'
+#        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-8'
+#      name: 'Check'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '2'
+#        command: './gradlew check "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-9'
+#      name: 'Render path matrix'
+#      continue-on-error: true
+#      run: './gradlew --continue :mediamp-mpv:renderPathMatrix "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-10'
+#      name: 'Upload render path matrix'
+#      uses: 'actions/upload-artifact@v4'
+#      with:
+#        name: 'render-path-matrix-github-windows-2022'
+#        path: 'mediamp-mpv/build/render-path-matrix/'
+#        if-no-files-found: 'warn'
+#        overwrite: 'true'
+#      if: 'always()'
+#    - id: 'step-11'
+#      name: 'Build FFmpeg artifacts'
+#      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-12'
+#      name: 'Build mpv runtime jar'
+#      run: './gradlew :mediamp-mpv:mpvRuntimeJarWindowsX64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-13'
+#      name: 'Verify mpv zero-config loading'
+#      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-14'
+#      name: 'Verify mpv Maven publication'
+#      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=x86_64" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#  build_github-windows-11-arm64:
+#    name: 'Build (Windows 11 AArch64 (GitHub))'
+#    runs-on:
+#    - 'windows-11-arm'
+#    permissions:
+#      actions: 'write'
+#    steps:
+#    - id: 'step-0'
+#      uses: 'actions/checkout@v4'
+#      with:
+#        lfs: 'true'
+#        submodules: 'recursive'
+#    - id: 'step-1'
+#      name: 'Setup JDK 17 for Windows ARM64'
+#      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
+#      with:
+#        java-version: '17'
+#        distribution: 'microsoft'
+#      env:
+#        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+#    - id: 'step-2'
+#      name: 'Setup JBR 21 for other OS'
+#      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
+#      with:
+#        java-version: '21'
+#        distribution: 'jetbrains'
+#      env:
+#        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+#    - id: 'step-3'
+#      run: 'echo "jvm.toolchain.version=21" >> local.properties'
+#    - id: 'step-4'
+#      name: 'Setup MSYS2 clangarm64'
+#      uses: 'msys2/setup-msys2@v2'
+#      with:
+#        msystem: 'CLANGARM64'
+#        update: 'true'
+#        install: |-
+#          git
+#          mingw-w64-clang-aarch64-clang
+#          mingw-w64-clang-aarch64-lld
+#          mingw-w64-clang-aarch64-libass
+#          mingw-w64-clang-aarch64-libplacebo
+#          mingw-w64-clang-aarch64-meson
+#          mingw-w64-clang-aarch64-ninja
+#          mingw-w64-clang-aarch64-pkgconf
+#          mingw-w64-clang-aarch64-nasm
+#          mingw-w64-clang-aarch64-openssl
+#          mingw-w64-clang-aarch64-ca-certificates
+#          mingw-w64-clang-aarch64-python-certifi
+#          mingw-w64-clang-aarch64-python
+#          mingw-w64-clang-aarch64-shaderc
+#          mingw-w64-clang-aarch64-spirv-cross
+#    - id: 'step-5'
+#      name: 'Configure MSYS2 root'
+#      run: |-
+#        $msys2Dir = '${{ steps.step-4.outputs.msys2-location }}'.Replace('\', '/')
+#        "msys2.dir=$msys2Dir" >> local.properties
+#    - id: 'step-6'
+#      name: 'Setup Gradle'
+#      uses: 'gradle/actions/setup-gradle@v3'
+#      with:
+#        cache-disabled: 'true'
+#    - id: 'step-7'
+#      name: 'Clean and download dependencies'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '3'
+#        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-8'
+#      name: 'Check'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '2'
+#        command: './gradlew :mediamp-mpv:desktopTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-9'
+#      name: 'Render path matrix'
+#      continue-on-error: true
+#      run: './gradlew --continue :mediamp-mpv:renderPathMatrix "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-10'
+#      name: 'Upload render path matrix'
+#      uses: 'actions/upload-artifact@v4'
+#      with:
+#        name: 'render-path-matrix-github-windows-11-arm64'
+#        path: 'mediamp-mpv/build/render-path-matrix/'
+#        if-no-files-found: 'warn'
+#        overwrite: 'true'
+#      if: 'always()'
+#    - id: 'step-11'
+#      name: 'Build FFmpeg artifacts'
+#      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-12'
+#      name: 'Build FFmpeg runtime jar'
+#      run: './gradlew :mediamp-ffmpeg:ffmpegRuntimeJarWindowsArm64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-13'
+#      name: 'Upload FFmpeg runtime jar'
+#      uses: 'actions/upload-artifact@v4'
+#      with:
+#        name: 'mediamp-ffmpeg-runtime-windows-arm64'
+#        path: 'mediamp-ffmpeg/build/libs/mediamp-ffmpeg-runtime-*-windows-arm64.jar'
+#        if-no-files-found: 'error'
+#        overwrite: 'true'
+#    - id: 'step-14'
+#      name: 'Build mpv runtime jar'
+#      run: './gradlew :mediamp-mpv:mpvRuntimeJarWindowsArm64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-15'
+#      name: 'Verify mpv zero-config loading'
+#      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#    - id: 'step-16'
+#      name: 'Verify mpv Maven publication'
+#      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishMpvRuntimeWindowsArm64PublicationToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DBoost_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=windows" "-Pmediamp.mpv.buildvariant=windows"'
+#  build_github-ubuntu-2404:
+#    name: 'Build (Ubuntu 24.04 x86_64)'
+#    runs-on:
+#    - 'ubuntu-24.04'
+#    permissions:
+#      actions: 'write'
+#    steps:
+#    - id: 'step-0'
+#      uses: 'actions/checkout@v4'
+#      with:
+#        lfs: 'true'
+#        submodules: 'recursive'
+#    - id: 'step-1'
+#      name: 'Setup JBR 21 for other OS'
+#      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
+#      with:
+#        java-version: '21'
+#        distribution: 'jetbrains'
+#      env:
+#        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+#    - id: 'step-2'
+#      run: 'echo "jvm.toolchain.version=21" >> local.properties'
+#    - id: 'step-3'
+#      run: 'chmod -R 777 .'
+#    - id: 'step-4'
+#      name: 'Install FFmpeg Dependencies for Ubuntu'
+#      run: 'chmod +x ./ci-helper/install-ffmpeg-deps-ubuntu.sh && ./ci-helper/install-ffmpeg-deps-ubuntu.sh'
+#    - id: 'step-5'
+#      name: 'Install mpv Dependencies for Ubuntu'
+#      run: 'chmod +x ./ci-helper/install-mpv-deps-ubuntu.sh && ./ci-helper/install-mpv-deps-ubuntu.sh'
+#    - id: 'step-6'
+#      name: 'Setup Gradle'
+#      uses: 'gradle/actions/setup-gradle@v3'
+#      with:
+#        cache-disabled: 'true'
+#    - id: 'step-7'
+#      name: 'Clean and download dependencies'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '3'
+#        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
+#    - id: 'step-8'
+#      name: 'Check'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '2'
+#        command: './gradlew check "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
+#    - id: 'step-9'
+#      name: 'Build FFmpeg artifacts'
+#      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
+#    - id: 'step-10'
+#      name: 'Build mpv runtime jar'
+#      run: './gradlew :mediamp-mpv:mpvRuntimeJarLinuxX64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
+#    - id: 'step-11'
+#      name: 'Verify mpv zero-config loading'
+#      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
+#    - id: 'step-12'
+#      name: 'Verify mpv Maven publication'
+#      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=linux" "-Pmediamp.mpv.buildvariant=linux"'
+#  build_github-macos-15-intel:
+#    name: 'Build (macOS 15 x86_64 (GitHub))'
+#    runs-on:
+#    - 'macos-15-intel'
+#    permissions:
+#      actions: 'write'
+#    steps:
+#    - id: 'step-0'
+#      uses: 'actions/checkout@v4'
+#      with:
+#        lfs: 'true'
+#        submodules: 'recursive'
+#    - id: 'step-1'
+#      name: 'Free space for macOS'
+#      continue-on-error: true
+#      run: 'chmod +x ./ci-helper/free-space-macos.sh && ./ci-helper/free-space-macos.sh'
+#    - id: 'step-2'
+#      name: 'Setup JBR 21 for other OS'
+#      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
+#      with:
+#        java-version: '21'
+#        distribution: 'jetbrains'
+#      env:
+#        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+#    - id: 'step-3'
+#      run: 'echo "jvm.toolchain.version=21" >> local.properties'
+#    - id: 'step-4'
+#      run: 'chmod -R 777 .'
+#    - id: 'step-5'
+#      name: 'Install dependencies for macOS'
+#      run: 'brew install nasm'
+#    - id: 'step-6'
+#      name: 'Install mpv build dependencies for macOS'
+#      run: 'brew install meson ninja libass libplacebo'
+#    - id: 'step-7'
+#      name: 'Setup Gradle'
+#      uses: 'gradle/actions/setup-gradle@v3'
+#      with:
+#        cache-disabled: 'true'
+#    - id: 'step-8'
+#      name: 'Clean and download dependencies'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '3'
+#        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-9'
+#      name: 'Check'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '2'
+#        command: './gradlew check "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-10'
+#      name: 'Build FFmpeg artifacts'
+#      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-11'
+#      name: 'Build mpv runtime jar'
+#      run: './gradlew :mediamp-mpv:mpvRuntimeJarMacosX64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-12'
+#      name: 'Verify mpv zero-config loading'
+#      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-13'
+#      name: 'Verify mpv Maven publication'
+#      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "-Pmediamp.ffmpeg.buildvariant=ios,macos" "-Pmediamp.mpv.buildvariant=macos"'
+#  build_self-hosted-macos-15:
+#    name: 'Build (macOS 15 AArch64 (Self-Hosted))'
+#    runs-on:
+#    - 'self-hosted'
+#    - 'macOS'
+#    - 'ARM64'
+#    permissions:
+#      actions: 'write'
+#    if: '${{ github.repository == ''open-ani/mediamp'' }}'
+#    steps:
+#    - id: 'step-0'
+#      uses: 'actions/checkout@v4'
+#      with:
+#        lfs: 'true'
+#        submodules: 'recursive'
+#    - id: 'step-1'
+#      name: 'Resolve JBR location'
+#      run: |-
+#        # Expand jbrLocationExpr
+#        jbr_location_expr=$(eval echo ${{ runner.tool_cache }}/jbrsdk_jcef-21.0.5-osx-aarch64-b631.8.tar.gz)
+#        echo "jbrLocation=$jbr_location_expr" >> $GITHUB_OUTPUT
+#    - id: 'step-2'
+#      name: 'Get JBR 21 for macOS AArch64'
+#      env:
+#        jbrLocation: '${{ steps.step-1.outputs.jbrLocation }}'
+#      run: |-
+#        jbr_location="$jbrLocation"
+#        checksum_url="https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.5-osx-aarch64-b631.8.tar.gz.checksum"
+#        checksum_file="checksum.tmp"
+#        wget -q -O $checksum_file $checksum_url
+#
+#        expected_checksum=$(awk '{print $1}' $checksum_file)
+#        file_checksum=""
+#
+#        if [ -f "$jbr_location" ]; then
+#            file_checksum=$(shasum -a 512 "$jbr_location" | awk '{print $1}')
+#        fi
+#
+#        if [ "$file_checksum" != "$expected_checksum" ]; then
+#            wget -q --tries=3 https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.5-osx-aarch64-b631.8.tar.gz -O "$jbr_location"
+#            file_checksum=$(shasum -a 512 "$jbr_location" | awk '{print $1}')
+#        fi
+#
+#        if [ "$file_checksum" != "$expected_checksum" ]; then
+#            echo "Checksum verification failed!" >&2
+#            rm -f $checksum_file
+#            exit 1
+#        fi
+#
+#        rm -f $checksum_file
+#        file "$jbr_location"
+#    - id: 'step-3'
+#      name: 'Setup JBR 21 for macOS AArch64'
+#      uses: 'gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d'
+#      with:
+#        java-version: '21'
+#        distribution: 'jdkfile'
+#        jdkFile: '${{ steps.step-1.outputs.jbrLocation }}'
+#      env:
+#        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+#    - id: 'step-4'
+#      run: 'echo "jvm.toolchain.version=21" >> local.properties'
+#    - id: 'step-5'
+#      run: 'chmod -R 777 .'
+#    - id: 'step-6'
+#      name: 'Setup Gradle'
+#      uses: 'gradle/actions/setup-gradle@v3'
+#      with:
+#        cache-disabled: 'true'
+#    - id: 'step-7'
+#      name: 'Clean and download dependencies'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '3'
+#        command: './gradlew "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-8'
+#      name: 'Check'
+#      uses: 'nick-fields/retry@v2'
+#      with:
+#        timeout_minutes: '60'
+#        max_attempts: '2'
+#        command: './gradlew check "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-9'
+#      name: 'Build FFmpeg artifacts'
+#      run: './gradlew :mediamp-ffmpeg:ffmpegBuildAll "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-10'
+#      name: 'Verify Apple XCFramework publication'
+#      run: './gradlew -Dmaven.repo.local=mediamp-ffmpeg/build/maven-local :mediamp-ffmpeg:publishFfmpegRuntimeIosXcframeworkPublicationToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-11'
+#      name: 'Build mpv runtime jar'
+#      run: './gradlew :mediamp-mpv:mpvRuntimeJarMacosArm64 "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-12'
+#      name: 'Verify mpv zero-config loading'
+#      run: './gradlew :mediamp-mpv:zeroConfigTest "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-13'
+#      name: 'Verify mpv Maven publication'
+#      run: './gradlew "-Dmaven.repo.local=mediamp-mpv/build/maven-local" :mediamp-mpv:publishToMavenLocal "--scan" "--no-configuration-cache" "-Porg.gradle.daemon.idletimeout=60000" "-Pkotlin.native.ignoreDisabledTargets=true" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx4g" "-Dkotlin.daemon.jvm.options=-Xmx4g" "--parallel" "-Pani.android.abis=arm64-v8a" "-Pmediamp.mpv.test.required=true" "-Pmediamp.ffmpeg.buildvariant=ios,macos,android" "-Pmediamp.mpv.buildvariant=macos"'
+#    - id: 'step-14'
+#      name: 'Cleanup temp files'
+#      continue-on-error: true
+#      run: 'chmod +x ./ci-helper/cleanup-temp-files-macos.sh && ./ci-helper/cleanup-temp-files-macos.sh'
